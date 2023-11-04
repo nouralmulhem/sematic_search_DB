@@ -28,7 +28,7 @@ class VecDBWorst:
                 score = self._cal_score(query, embed)
                 scores.append((score, id))
         # here we assume that if two rows have the same score, return the lowest ID
-        scores = sorted(scores)[:top_k]
+        scores = sorted(scores, reverse=True)[:top_k]
         return [s[1] for s in scores]
     
     def _cal_score(self, vec1, vec2):
