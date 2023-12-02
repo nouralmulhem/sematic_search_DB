@@ -2,6 +2,7 @@ import random
 import struct
 from typing import Annotated, Dict, List
 import numpy as np
+import time
 
 class BinaryFile:
     def __init__(self, filename):
@@ -41,8 +42,8 @@ class BinaryFile:
 
 def test():
     # setup data
-    num_rows = 100000
-    num_tests = 1000
+    num_rows = 1000000
+    num_tests = 10000
     vec_size = 70
     # define instance of class
     file_path = "data.bin"
@@ -55,7 +56,11 @@ def test():
     # for i in range(num_rows):
     #     bfh.insert_row(i,records_np[i])
     records_dict = [{"id": i, "embed": list(row)} for i, row in enumerate(records_np)]
+    tic = time.time()
     bfh.insert_records(records_dict)
+    toc = time.time()
+    np_insert_time = toc - tic
+    print(f'The time needed to insert {num_rows} is {np_insert_time}')
 
     count_test = 0
     failed_ids = []
