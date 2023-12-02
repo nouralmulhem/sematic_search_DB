@@ -59,8 +59,8 @@ def eval(results: List[Result]):
 
 
 if __name__ == "__main__":
-    db = IvfDb()
-    # records_np = np.random.random((100, 70))
+    db = IvfDb(file_path = "saved_db.csv")
+    # records_np = np.random.random((1000000, 70))
     # records_dict = [{"id": i, "embed": list(row)} for i, row in enumerate(records_np)]
     # _len = len(records_np)
     # print('insertion')
