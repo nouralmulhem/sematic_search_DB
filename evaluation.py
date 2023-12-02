@@ -59,17 +59,36 @@ def eval(results: List[Result]):
 
 
 if __name__ == "__main__":
-    db = IvfDb()
-    # records_np = np.random.random((100, 70))
-    # records_dict = [{"id": i, "embed": list(row)} for i, row in enumerate(records_np)]
-    # _len = len(records_np)
-    # print('insertion')
-    # db.insert_records(records_dict)
-    db.build()
-    records_np = db.rertive_all()
-    print('run_queries')
+
+    work_on_old_db = False
+    db = None
+    records_np = []
+    #################################################
+    if not work_on_old_db:
+        db = IvfDb()
+        records_np = np.random.random((1000, 70))
+        records_dict = [{"id": i, "embed": list(row)} for i, row in enumerate(records_np)]
+        print('insertion is started')
+        # start time
+        tic = time.time()
+        db.insert_records(records_dict)
+        # end time
+        toc = time.time()
+        print(f'insertion is completed with time : {toc - tic}')
+    else:
+        db = IvfDb(new_db = False)
+        records_np = db.rertive_all()
+        db.build()
+
+    _len = len(records_np) 
+    print('run_queries started')
+     # start time
+    tic = time.time()
     res = run_queries(db, records_np, 5, 10)
-    print('eval')
+    # end time
+    toc = time.time()
+    print(f'run_queries is completed with time : {toc - tic}')
+    print('evaluation result')
     print(eval(res))
     
     # records_np = np.concatenate([records_np, np.random.random((90000, 70))])
