@@ -176,10 +176,10 @@ class BinaryFile:
 
 class VecDB:
     def __init__(self, file_path="10k", new_db = True) -> None:
-        self.file_path = "saved_db_" + file_path + ".bin"
-        self.centroids = "centroids_" + file_path + ".bin"
-        self.position = "positions_" + file_path + ".bin"
-        self.cluster_path = "cluster_" + file_path + ".bin"
+        self.file_path = "/content/saved_db_" + file_path + ".bin"
+        self.centroids = "/content/centroids_" + file_path + ".bin"
+        self.position = "/content/positions_" + file_path + ".bin"
+        self.cluster_path = "/content/cluster_" + file_path + ".bin"
         # number of clusters
         self.n_clusters1 = 100
         # self.n_clusters2 = 10
