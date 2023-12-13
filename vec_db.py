@@ -121,7 +121,6 @@ class BinaryFile:
                 positions.append(data)
         return np.array(positions)
 
-####################################################
     # cluster_id id
     def insert_cluster(self, row_id, row_data):
       with open(self.filename, 'ab') as file:
@@ -173,15 +172,14 @@ class BinaryFile:
         return np.array(rows)
 
 
-####################################################
 
 
 class VecDB:
-    def __init__(self, file_path="saved_db_10k.bin", position='positions_10k.bin', centroids='centroids_10k.bin', cluster='cluster_10k.bin', new_db = True) -> None:
-        self.file_path = file_path
-        self.centroids = centroids
-        self.position = position
-        self.cluster_path = cluster
+    def __init__(self, file_path="10k", new_db = True) -> None:
+        self.file_path = "saved_db_" + file_path + ".bin"
+        self.centroids = "centroids_" + file_path + ".bin"
+        self.position = "positions_" + file_path + ".bin"
+        self.cluster_path = "cluster_" + file_path + ".bin"
         # number of clusters
         self.n_clusters1 = 100
         # self.n_clusters2 = 10
