@@ -26,20 +26,25 @@ class BinaryFile:
             # Write the packed data to the file
             file.write(packed_data)
 
-    def read_row(self, row_id):
-        with open(self.filename, 'rb') as file:
-            # Calculate the position of the row
-            # Size of one row (ID + vec_size * floats)
-            position = row_id * \
-                (self.int_size + self.vec_size * self.float_size)
-            # Seek to the position of the row
-            file.seek(position)
-            # Read the row
-            # Size of one row (ID + vec_size * floats)
-            packed_data = file.read(
-                self.int_size + self.vec_size * self.float_size)
-            data = struct.unpack(f'i{self.vec_size}f', packed_data)
-            return np.array(data)
+    def read_record(self, record_index):
+        # Open the file in binary mode
+        with open(self.filename, "rb") as file:
+            # Calculate the size of each record based on the structure of the data
+            record_size = struct.calcsize('!I') + (self.vec_size) * struct.calcsize('!f')
+
+            # Seek to the beginning of the specified record
+            file.seek(record_index * record_size, 0)
+
+            # Read the record
+            record_binary = file.read(record_size)
+
+            if not record_binary:
+                return None  # End of file or invalid record index
+
+            # Unpack the binary data into a list of integers and floats
+            unpacked_data = struct.unpack('!' + 'I' + 'f' * self.vec_size, record_binary)
+
+        return unpacked_data
 
     def insert_records(self, rows: List[Dict[int, Annotated[List[float], 70]]]):
         first_position = None
@@ -61,18 +66,19 @@ class BinaryFile:
 
     # read all rows
     def read_all(self):
+        # Calculate the size of each record based on the structure of the data
+        record_size = struct.calcsize('!I') + (self.vec_size) * struct.calcsize('!f')
         rows = []
         with open(self.filename, 'rb') as file:
             # iterate over all rows
             while True:
                 # Read the row
-                packed_data = file.read(
-                    self.int_size + self.vec_size * self.float_size)
+                packed_data = file.read(record_size)
                 if packed_data == b'':
                     break
-                data = struct.unpack(f'i{self.vec_size}f', packed_data)
+                data = struct.unpack('!I' + 'f' * self.vec_size, packed_data)
                 rows.append(data)
-        return np.array(rows)
+        return np.array(rows, dtype=np.float32)
     
     def read_records(self, start_record, end_record):
         # Open the file in binary mode
@@ -97,7 +103,7 @@ class BinaryFile:
                 # Append the record to the list
                 records.append(unpacked_data)
 
-        return records
+        return np.array(records, dtype=np.float32)
 
     def insert_position(self, row_id, position):
         with open(self.filename, 'ab') as file:
