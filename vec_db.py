@@ -11,6 +11,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 import random
 from sklearn.utils import shuffle
+import pickle
 
 AVG_OVERX_ROWS = 10
 
@@ -120,12 +121,67 @@ class BinaryFile:
                 positions.append(data)
         return np.array(positions)
 
+    # cluster_id id
+    def insert_cluster(self, row_id, row_data):
+      with open(self.filename, 'ab') as file:
+            packed_data = struct.pack('ii', row_id, row_data)
+            file.write(packed_data)
+
+    def insert_clusters(self, row_id, rows):
+        first_position = None
+        last_position = None
+        with open(self.filename, 'ab') as file:
+            # record the position before writing
+            first_position = file.tell()
+            for row in rows:
+                # Pack the ID and the float values into a binary format
+                packed_data = struct.pack('ii', row_id, row)
+                # Write the packed data to the file
+                file.write(packed_data)
+            # Record the position after writing
+            last_position = file.tell()
+        # Return the first and last position
+        return first_position, last_position
+
+    def read_clusters_in_range(self, first_position, last_position):
+        records = []
+        with open(self.filename, 'rb') as file:
+            file.seek(first_position)
+            while file.tell() < last_position:
+                packed_data = file.read(
+                    self.int_size + self.int_size)
+                if packed_data == b'':
+                    break
+                data = struct.unpack('ii', packed_data)
+                records.append(data)
+        return np.array(records)
+
+    # read all rows
+    def read_all_clusters(self):
+        rows = []
+        with open(self.filename, 'rb') as file:
+            # iterate over all rows
+            while True:
+                # Read the row
+                packed_data = file.read(
+                    self.int_size + self.int_size)
+                if packed_data == b'':
+                    break
+                data = struct.unpack('ii', packed_data)
+                rows.append(data)
+        return np.array(rows)
+
+
+
 
 class VecDB:
-    def __init__(self, file_path="saved_db_1m.bin", new_db = True) -> None:
-        self.file_path = file_path
+    def __init__(self, file_path="10k", new_db = True) -> None:
+        self.file_path = "/content/saved_db_" + file_path + ".bin"
+        self.centroids = "/content/centroids_" + file_path + ".bin"
+        self.position = "/content/positions_" + file_path + ".bin"
+        self.cluster_path = "/content/cluster_" + file_path + ".bin"
         # number of clusters
-        self.n_clusters1 = 1000
+        self.n_clusters1 = 100
         # self.n_clusters2 = 10
         # binary file handler
         self.bfh = BinaryFile(self.file_path)
@@ -143,7 +199,6 @@ class VecDB:
         # return all rows
         return self.bfh.read_all()[:, 1:]
 
-
     #############################################################
     ############     search with cos similarity     #############
     #############################################################
@@ -155,9 +210,10 @@ class VecDB:
           # read position of this cluster index (centroid index)
           first_position, second_position = bfh_c_pos.read_position(int(score[1]))[1:]
           # read all vectors in this cluster as [[], [], [], ...]
-          region_vectors = bfh_c.read_positions_in_range(first_position, second_position)
+          vec_ids = bfh_c.read_clusters_in_range(first_position, second_position)
           region_vectors_scores = []
-          for vec in region_vectors:
+          for vec_id in vec_ids:
+              vec = self.bfh.read_row(int(vec_id[1]))
               # read id and features of this vector
               id = vec[0]
               embed = vec[1:]
@@ -174,67 +230,20 @@ class VecDB:
 
       # the top_results here has scores and ids sorted on scores
       return top_results
-    
-
-    #############################################################
-    ##################     search with knn     ##################
-    #############################################################
-    def _search_with_knn(self, position_file, cluster_file, scores_id_array, query, top_results_num):
-      
-      all_regions_vec = []
-      classes = []
-
-      vec_id_dict = dict()
-
-      bfh_c_pos = BinaryFile(position_file)
-      bfh_c = BinaryFile(cluster_file)
-
-      # collect all vectors in all regions to train the knn on
-      for score in scores_id_array:
-          # read position of this cluster index (centroid index)
-          first_position, second_position = bfh_c_pos.read_position(int(score[1]))[1:]
-          # read all vectors in this cluster as [[], [], [], ...]
-          region_vectors = bfh_c.read_positions_in_range(first_position, second_position)
-          for vec in region_vectors:
-              # save all vectors and their ids to retrive them back after training the model
-              vec_id_dict.update({tuple(vec[1:]): vec[0]})
-              # save all embeddings to train the model on
-              all_regions_vec.append(vec[1:])
-
-          # save the classes of all vectors to train the knn on
-          classes = classes + [score[1] for _ in range(len(region_vectors))]
-
-      # train the knn model with number of neighbors = 10
-      knn = KNeighborsClassifier(n_neighbors=10)
-      knn.fit(all_regions_vec, classes)
-
-      # this have the ids of nearest vectors to the query
-      predictions = knn.kneighbors(query, return_distance=False)
-
-      top_results = []
-      for vec in predictions[0]:
-          vector_score = self._cal_score(query, all_regions_vec[vec])
-          # get the id of this vector from the dict we saved before
-          top_results.append((vector_score, vec_id_dict.get(tuple(all_regions_vec[vec]))))
-      top_results = sorted(top_results, reverse=True)[:top_results_num]
-
-      # the top_results here has scores and ids sorted on scores
-      return top_results
-
 
     #############################################################
     #############     our rock star retrive     #################
     #############################################################
     def retrive(self, query: Annotated[List[float], 70], top_k=5):
         scores = []
-        centroids_level2 = BinaryFile('centroids_1.bin').read_all()
+        centroids_level2 = BinaryFile(self.centroids).read_all()
         for centroid in centroids_level2:
             score_centroid = self._cal_score(query, centroid[1:])
             id = centroid[0]
             scores.append((score_centroid, id))
-        scores = sorted(scores, reverse=True)[:30]  
+        scores = sorted(scores, reverse=True)[:30]
 
-        top_results_level_1 = self._search_with_cos_similarity('positions_cluster_1.bin', 'cluster_1.bin', scores, query, 30, top_k)
+        top_results_level_1 = self._search_with_cos_similarity(self.position, self.cluster_path, scores, query, 30, top_k)
 
         # top_results_level_1 = self._search_with_knn('positions_cluster_1.bin', 'cluster_1.bin', scores, query, top_k)
 
@@ -270,11 +279,10 @@ class VecDB:
         bfh_c_pos = BinaryFile(position_file_name)
         bfh_cen = BinaryFile(centroids_file_name)
 
-        # insert clusters and positions
         for cluster_index, cluster_vectors in enumerate(clusters):
-            cluster_dict = [{"id": int(row[0]), "embed": row[1:]} for row in cluster_vectors]
-            first_position, last_position = bfh_c.insert_records(cluster_dict)
+            first_position, last_position = bfh_c.insert_clusters(cluster_index, cluster_vectors)
             bfh_c_pos.insert_position(cluster_index, [first_position, last_position])
+        #############################################################
 
         # insert centroids
         centroids_dict = [{"id": i, "embed": row} for i, row in enumerate(centroids)]
@@ -287,72 +295,63 @@ class VecDB:
     #############################################################
     #############      partial train kmeans    ##################
     #############################################################
-    def partial_predict(self, embeds, n_clusters):
+    def partial_predict(self, rows, n_clusters):
 
         # training_set = embeds[np.random.randint(len(embeds), size=100000 if len(embeds) > 100000 else 1000)]
-        training_set = shuffle(embeds)[:1000]
+        # training_set = shuffle(rows)[:100000, 1:]
+
 
         kmeans = KMeans(n_clusters=n_clusters)
-        kmeans.fit([tuple(embed) for embed in training_set])
-
+        kmeans.fit([tuple(embed) for embed in rows[:, 1:]])
+        # del training_set
         # predict rest of data
         cluster_labels = []
-        for i, embed in enumerate(embeds):
-            cluster_id = kmeans.predict([tuple(embed)])
+        for embed in rows:
+            cluster_id = kmeans.predict([tuple(embed[1:])])
             cluster_labels.append(cluster_id)
 
         # centroids which are list of vectors (70 float each)
         centroids = kmeans.cluster_centers_.tolist()
-
+        del kmeans
         return centroids, cluster_labels
-    
 
-    #############################################################
-    #################      training kmeans    ###################
-    #############################################################
-    def kmeans_training(self, embeds, n_clusters):
-
-        # kmeans = MiniBatchKMeans(
-        #     n_clusters=self.n_clusters1, batch_size=1000, random_state=42, n_init=10)
-        kmeans = KMeans(n_clusters=n_clusters)
-        kmeans.fit([tuple(embed) for embed in embeds])
-
-        # get the labels id of each cluster list of size db each vector to its cluster
-        cluster_labels = kmeans.labels_
-        centroids = kmeans.cluster_centers_.tolist()
-
-        return centroids, cluster_labels
-        
-        
 
     #############################################################
     ########     second rock star building the index     ########
     #############################################################
     def build_index(self):
 
-        # read all rows
-        rows = self.bfh.read_all()
 
-        ###################### level 1 ######################  
+        # read 100 000
+        # num_ids = 10000
+        # leno = 10 * 1000000
+        # ranges = random.sample(range(leno), num_ids)
+        # read all rows
+        rows = []
+        for id in range(10000):
+          rows.append(self.bfh.read_row(id))
+
+        rows = np.array(rows)
+        print(len(rows))
+
+        ###################### level 1 ######################
 
         # centroids, cluster_labels = self.kmeans_training(rows[:, 1:], self.n_clusters1)
-        centroids, cluster_labels = self.partial_predict(rows[:, 1:], self.n_clusters1)
+        # centroids, cluster_labels = self.partial_predict(rows, self.n_clusters1)
 
+        kmeans = KMeans(n_clusters=self.n_clusters1)
+        kmeans.fit([tuple(embed) for embed in rows[:, 1:]])
+        ###############################################################################
         clusters = [[] for _ in range(self.n_clusters1)]
-        
-        for i, label in enumerate(cluster_labels):
-            clusters[int(label)].append(rows[i])
 
-        self.write_to_file('cluster_1.bin', 'positions_cluster_1.bin', 'centroids_1.bin', clusters, centroids)
+        veccs = [self.bfh.read_row(id) for id in range(10000)]
+        predictions = kmeans.predict([tuple(row[1:]) for row in veccs])
+        for id, cluster_id in enumerate(predictions):
+            clusters[int(cluster_id)].append(int(veccs[id][0]))
+
+        # centroids which are list of vectors (70 float each)
+        centroids = kmeans.cluster_centers_.tolist()
 
 
-        ###################### level 2 ######################  
 
-        # centroids_level2, cluster_labels = self.kmeans_training(centroids, self.n_clusters2)
-
-        # clusters = [[] for _ in range(self.n_clusters2)]
-
-        # for i, label in enumerate(cluster_labels):
-        #     clusters[int(label)].append([i]+ list(centroids[i]))
-
-        # self.write_to_file('cluster_2.bin', 'positions_cluster_2.bin', 'centroids_2.bin', clusters, centroids_level2)
+        self.write_to_file(self.cluster_path, self.position, self.centroids, clusters, centroids)
