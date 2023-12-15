@@ -208,20 +208,26 @@ class VecDB:
       top_results = []
       for score in scores_id_array:
           # read position of this cluster index (centroid index)
-          first_position, second_position = bfh_c_pos.read_position(int(score[1]))[1:]
+          first_position, second_position = bfh_c_pos.read_position(int(score))[1:]
           # read all vectors in this cluster as [[], [], [], ...]
           vec_ids = bfh_c.read_clusters_in_range(first_position, second_position)
-          region_vectors_scores = []
-          for vec_id in vec_ids:
-              vec = self.bfh.read_row(int(vec_id[1]))
-              # read id and features of this vector
-              id = vec[0]
-              embed = vec[1:]
-              vector_score = self._cal_score(query, embed)
-              region_vectors_scores.append((vector_score, id))
+          all_vecs = [self.bfh.read_row(int(vec_id[1])) for vec_id in vec_ids]
+          embeds = np.array([item[1:] for item in all_vecs])
+          vec_sc = embeds.dot(query.T).T / (np.linalg.norm(embeds, axis=1) * np.linalg.norm(query))
+          region_vectors_scores = [(vec_sc[0][i], all_vecs[i][0]) for i in range(len(all_vecs))]
+          # results_ids = np.argsort(all_vecs[:, 1:].dot(query.T).T / (np.linalg.norm(vectors, axis=1) * np.linalg.norm(query)), axis= 1).squeeze().tolist()[::-1]
+          # region_vectors_scores = []
+          # for vec_id in vec_ids:
+          #     vec = self.bfh.read_row(int(vec_id[1]))
+          #     # read id and features of this vector
+          #     id = vec[0]
+          #     embed = vec[1:]
+          #     vector_score = self._cal_score(query, embed)
+          #     region_vectors_scores.append((vector_score, id))
 
           # get k (top_in_region_num) the nearest vectors of that region
           region_vectors_scores = sorted(region_vectors_scores, reverse=True)[:top_in_region_num]
+          # region_vectors_scores = results_ids[:top_in_region_num]
           # concat to get all results of all regions
           top_results = top_results + region_vectors_scores
 
@@ -237,11 +243,9 @@ class VecDB:
     def retrive(self, query: Annotated[List[float], 70], top_k=5):
         scores = []
         centroids_level2 = BinaryFile(self.centroids).read_all()
-        for centroid in centroids_level2:
-            score_centroid = self._cal_score(query, centroid[1:])
-            id = centroid[0]
-            scores.append((score_centroid, id))
-        scores = sorted(scores, reverse=True)[:30]
+        results_ids = np.argsort(centroids_level2[:, 1:].dot(query.T).T / (np.linalg.norm(centroids_level2[:, 1:], axis=1) * np.linalg.norm(query)), axis= 1).squeeze().tolist()[::-1]
+        # scores = sorted(scores, reverse=True)[:30]
+        scores = results_ids[:30]
 
         top_results_level_1 = self._search_with_cos_similarity(self.position, self.cluster_path, scores, query, 30, top_k)
 
