@@ -4,8 +4,8 @@ from nanopq import PQ
 import pickle
 import time
 
-is_new_db = False
-is_sampled = False
+is_new_db = True
+is_sampled = True
 
 # Create the database
 db = CreateDatabase(file_path="saved_db.bin", new_db=is_new_db)
@@ -18,24 +18,25 @@ if is_new_db:
         db.insert_records(records_dict)
 
 # Now let's create the sampled DB
-sampled_db = CreateDatabase(file_path='sampled_db.bin', new_db=is_sampled)
+# sampled_db = CreateDatabase(file_path='sampled_db.bin', new_db=is_sampled)
 
 
-if is_sampled:
-    to_be_inserted = []
-    for iter in range(1_000_000):
-        print('Iteration: '+str(iter))
-        #   Read 20 records. Get their mean
-        section = db.bfh.read_records(iter*20,(iter+1)*20)
-        section = np.array([row[1:] for row in section], dtype=np.float32)
-        sample = list(np.mean(section, 0))
-        # Append to the list that will be inserted into the sampled DB
-        to_be_inserted.append({"id":iter, "embed":sample})
-        # Clear
-        section = []
-        sample = []
+# if is_sampled:
+data = []
+for iter in range(1_000_000):
+    print('Iteration: '+str(iter))
+    #   Read 20 records. Get their mean
+    section = db.bfh.read_records(iter*20,(iter+1)*20)
+    section = np.array([row[1:] for row in section], dtype=np.float32)
+    sample = list(np.mean(section, 0))
+    # Append to the list that will be inserted into the sampled DB
+    # data.append({"id":iter, "embed":sample})
+    data.append(sample)
+    # Clear
+    section = []
+    sample = []
     
-    sampled_db.insert_records(to_be_inserted)
+    # sampled_db.insert_records(to_be_inserted)
 
 
 start_time = time.time()
@@ -45,9 +46,10 @@ N = 1_000_000
 D = 70
 
 # Load the sampled records
-data = sampled_db.bfh.read_all()
-assert data.shape == (1000000, 71)
-data = np.delete(data, 0, axis=1)
+# data = sampled_db.bfh.read_all()
+# assert data.shape == (1000000, 71)
+# data = np.delete(data, 0, axis=1)
+data = np.array(data)
 assert data.shape == (1000000, 70)
 assert data.dtype == np.float32
 

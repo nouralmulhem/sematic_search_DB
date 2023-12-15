@@ -91,7 +91,7 @@ class BinaryFile:
 
             # Read the specified range of records
             records = []
-            for _ in range(start_record, end_record + 1):
+            for _ in range(start_record, end_record):
                 record_binary = file.read(record_size)
 
                 if not record_binary:
@@ -147,17 +147,23 @@ class CreateDatabase:
         self.bfh = BinaryFile(self.file_path)
         if new_db:
             # just open new file to delete the old one
-            with open(self.file_path, "w") as fout:
+            with open(self.file_path, "ab") as fout:
                 # if you need to add any head to the file
                 pass
 
     def insert_records(self, rows: List[Dict[int, Annotated[List[float], 70]]]):
         # insert all rows with bfh
         self.bfh.insert_records(rows)
+    
+def cal_score(vec1, vec2):
+    dot_product = np.dot(vec1, vec2)
+    norm_vec1 = np.linalg.norm(vec1)
+    norm_vec2 = np.linalg.norm(vec2)
+    cosine_similarity = dot_product / (norm_vec1 * norm_vec2)
+    return cosine_similarity
 
-
-db = CreateDatabase(file_path="saved_db.bin")
-records_np = np.random.random((1000, 70))
-records_dict = [{"id": i, "embed": list(row)}
-                for i, row in enumerate(records_np)]
-db.insert_records(records_dict)
+# db = CreateDatabase(file_path="saved_db.bin")
+# records_np = np.random.random((1000, 70))
+# records_dict = [{"id": i, "embed": list(row)}
+#                 for i, row in enumerate(records_np)]
+# db.insert_records(records_dict)
