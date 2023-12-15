@@ -203,39 +203,22 @@ class VecDB:
     ############     search with cos similarity     #############
     #############################################################
     def _search_with_cos_similarity(self, position_file, cluster_file, scores_id_array, query, top_in_region_num, top_results_num):
-      bfh_c_pos = BinaryFile(position_file)
-      bfh_c = BinaryFile(cluster_file)
-      top_results = []
-      for score in scores_id_array:
-          # read position of this cluster index (centroid index)
-          first_position, second_position = bfh_c_pos.read_position(int(score))[1:]
-          # read all vectors in this cluster as [[], [], [], ...]
-          vec_ids = bfh_c.read_clusters_in_range(first_position, second_position)
-          all_vecs = [self.bfh.read_row(int(vec_id[1])) for vec_id in vec_ids]
-          embeds = np.array([item[1:] for item in all_vecs])
-          vec_sc = embeds.dot(query.T).T / (np.linalg.norm(embeds, axis=1) * np.linalg.norm(query))
-          region_vectors_scores = [(vec_sc[0][i], all_vecs[i][0]) for i in range(len(all_vecs))]
-          # results_ids = np.argsort(all_vecs[:, 1:].dot(query.T).T / (np.linalg.norm(vectors, axis=1) * np.linalg.norm(query)), axis= 1).squeeze().tolist()[::-1]
-          # region_vectors_scores = []
-          # for vec_id in vec_ids:
-          #     vec = self.bfh.read_row(int(vec_id[1]))
-          #     # read id and features of this vector
-          #     id = vec[0]
-          #     embed = vec[1:]
-          #     vector_score = self._cal_score(query, embed)
-          #     region_vectors_scores.append((vector_score, id))
+        bfh_c_pos = BinaryFile(position_file)
+        bfh_c = BinaryFile(cluster_file)
+        top_results = []
+        all_all = []
+        for score in scores_id_array:
+            first_position, second_position = bfh_c_pos.read_position(int(score))[1:]
+            vec_ids = bfh_c.read_clusters_in_range(first_position, second_position)
+            all_vecs = [self.bfh.read_row(int(vec_id[1])) for vec_id in vec_ids]
+            all_all = all_all + all_vecs
 
-          # get k (top_in_region_num) the nearest vectors of that region
-          region_vectors_scores = sorted(region_vectors_scores, reverse=True)[:top_in_region_num]
-          # region_vectors_scores = results_ids[:top_in_region_num]
-          # concat to get all results of all regions
-          top_results = top_results + region_vectors_scores
+        all_all = np.array(all_all)
+        results_ids = np.argsort(all_all[:, 1:].dot(query.T).T / (np.linalg.norm(all_all[:, 1:], axis=1) * np.linalg.norm(query)), axis= 1).squeeze().tolist()[::-1]
+        top_results = results_ids[:top_results_num]
+        rs = [all_all[x] for x in top_results]
 
-      # take the best k (top_results_num) vectors in those vectors
-      top_results = sorted(top_results, reverse=True)[:top_results_num]
-
-      # the top_results here has scores and ids sorted on scores
-      return top_results
+        return rs
 
     #############################################################
     #############     our rock star retrive     #################
@@ -244,15 +227,11 @@ class VecDB:
         scores = []
         centroids_level2 = BinaryFile(self.centroids).read_all()
         results_ids = np.argsort(centroids_level2[:, 1:].dot(query.T).T / (np.linalg.norm(centroids_level2[:, 1:], axis=1) * np.linalg.norm(query)), axis= 1).squeeze().tolist()[::-1]
-        # scores = sorted(scores, reverse=True)[:30]
         scores = results_ids[:30]
 
         top_results_level_1 = self._search_with_cos_similarity(self.position, self.cluster_path, scores, query, 30, top_k)
 
-        # top_results_level_1 = self._search_with_knn('positions_cluster_1.bin', 'cluster_1.bin', scores, query, top_k)
-
-        # here we assume that if two rows have the same score, return the lowest ID
-        return [score[1] for score in top_results_level_1]
+        return [score[0] for score in top_results_level_1]
 
 
     #############################################################
