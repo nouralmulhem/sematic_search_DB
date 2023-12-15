@@ -172,8 +172,6 @@ class BinaryFile:
         return np.array(rows)
 
 
-
-
 class VecDB:
     def __init__(self, file_path="10k", new_db = True) -> None:
         self.file_path = "saved_db_" + file_path + ".bin"
@@ -182,7 +180,6 @@ class VecDB:
         self.cluster_path = "cluster_" + file_path + ".bin"
         # number of clusters
         self.n_clusters1 = 100
-        # self.n_clusters2 = 10
         # binary file handler
         self.bfh = BinaryFile(self.file_path)
         if new_db:
@@ -203,22 +200,28 @@ class VecDB:
     ############     search with cos similarity     #############
     #############################################################
     def _search_with_cos_similarity(self, position_file, cluster_file, scores_id_array, query, top_in_region_num, top_results_num):
-        bfh_c_pos = BinaryFile(position_file)
-        bfh_c = BinaryFile(cluster_file)
-        top_results = []
-        all_all = []
-        for score in scores_id_array:
-            first_position, second_position = bfh_c_pos.read_position(int(score))[1:]
-            vec_ids = bfh_c.read_clusters_in_range(first_position, second_position)
-            all_vecs = [self.bfh.read_row(int(vec_id[1])) for vec_id in vec_ids]
-            all_all = all_all + all_vecs
+      bfh_c_pos = BinaryFile(position_file)
+      bfh_c = BinaryFile(cluster_file)
+      top_results = []
+      for score in scores_id_array:
+          # read position of this cluster index (centroid index)
+          first_position, second_position = bfh_c_pos.read_position(int(score))[1:]
+          # read all vectors in this cluster as [[], [], [], ...]
+          vec_ids = bfh_c.read_clusters_in_range(first_position, second_position)
+          all_vecs = [self.bfh.read_row(int(vec_id[1])) for vec_id in vec_ids]
+          embeds = np.array([item[1:] for item in all_vecs])
+          vec_sc = embeds.dot(query.T).T / (np.linalg.norm(embeds, axis=1) * np.linalg.norm(query))
+          region_vectors_scores = [(vec_sc[0][i], all_vecs[i][0]) for i in range(len(all_vecs))]
+          # get k (top_in_region_num) the nearest vectors of that region
+          region_vectors_scores = sorted(region_vectors_scores, reverse=True)[:top_in_region_num]
+          # concat to get all results of all regions
+          top_results = top_results + region_vectors_scores
 
-        all_all = np.array(all_all)
-        results_ids = np.argsort(all_all[:, 1:].dot(query.T).T / (np.linalg.norm(all_all[:, 1:], axis=1) * np.linalg.norm(query)), axis= 1).squeeze().tolist()[::-1]
-        top_results = results_ids[:top_results_num]
-        rs = [all_all[x] for x in top_results]
+      # take the best k (top_results_num) vectors in those vectors
+      top_results = sorted(top_results, reverse=True)[:top_results_num]
 
-        return rs
+      # the top_results here has scores and ids sorted on scores
+      return top_results
 
     #############################################################
     #############     our rock star retrive     #################
@@ -227,11 +230,12 @@ class VecDB:
         scores = []
         centroids_level2 = BinaryFile(self.centroids).read_all()
         results_ids = np.argsort(centroids_level2[:, 1:].dot(query.T).T / (np.linalg.norm(centroids_level2[:, 1:], axis=1) * np.linalg.norm(query)), axis= 1).squeeze().tolist()[::-1]
-        scores = results_ids[:30]
+        scores = results_ids[:50]
 
-        top_results_level_1 = self._search_with_cos_similarity(self.position, self.cluster_path, scores, query, 30, top_k)
+        top_results_level_1 = self._search_with_cos_similarity(self.position, self.cluster_path, scores, query, 50, top_k)
 
-        return [score[0] for score in top_results_level_1]
+        # here we assume that if two rows have the same score, return the lowest ID
+        return [score[1] for score in top_results_level_1]
 
 
     #############################################################
@@ -265,24 +269,19 @@ class VecDB:
         for cluster_index, cluster_vectors in enumerate(clusters):
             first_position, last_position = bfh_c.insert_clusters(cluster_index, cluster_vectors)
             bfh_c_pos.insert_position(cluster_index, [first_position, last_position])
-        #############################################################
 
         # insert centroids
         centroids_dict = [{"id": i, "embed": row} for i, row in enumerate(centroids)]
         bfh_cen.insert_records(centroids_dict)
 
-        for cluster_index, cluster_vectors in enumerate(clusters):
-          print(f"Cluster {cluster_index} has {len(cluster_vectors)} vectors.")
+        # for cluster_index, cluster_vectors in enumerate(clusters):
+        #   print(f"Cluster {cluster_index} has {len(cluster_vectors)} vectors.")
 
 
     #############################################################
     #############      partial train kmeans    ##################
     #############################################################
     def partial_predict(self, rows, n_clusters):
-
-        # training_set = embeds[np.random.randint(len(embeds), size=100000 if len(embeds) > 100000 else 1000)]
-        # training_set = shuffle(rows)[:100000, 1:]
-
 
         kmeans = KMeans(n_clusters=n_clusters)
         kmeans.fit([tuple(embed) for embed in rows[:, 1:]])
@@ -304,27 +303,16 @@ class VecDB:
     #############################################################
     def build_index(self):
 
-
-        # read 100 000
-        # num_ids = 10000
-        # leno = 10 * 1000000
-        # ranges = random.sample(range(leno), num_ids)
         # read all rows
         rows = []
         for id in range(10000):
           rows.append(self.bfh.read_row(id))
 
         rows = np.array(rows)
-        print(len(rows))
-
-        ###################### level 1 ######################
-
-        # centroids, cluster_labels = self.kmeans_training(rows[:, 1:], self.n_clusters1)
-        # centroids, cluster_labels = self.partial_predict(rows, self.n_clusters1)
+        # print(len(rows))
 
         kmeans = KMeans(n_clusters=self.n_clusters1)
         kmeans.fit([tuple(embed) for embed in rows[:, 1:]])
-        ###############################################################################
         clusters = [[] for _ in range(self.n_clusters1)]
 
         veccs = [self.bfh.read_row(id) for id in range(10000)]
@@ -334,7 +322,5 @@ class VecDB:
 
         # centroids which are list of vectors (70 float each)
         centroids = kmeans.cluster_centers_.tolist()
-
-
 
         self.write_to_file(self.cluster_path, self.position, self.centroids, clusters, centroids)
