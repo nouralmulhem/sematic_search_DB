@@ -230,9 +230,9 @@ class VecDB:
         scores = []
         centroids_level2 = BinaryFile(self.centroids).read_all()
         results_ids = np.argsort(centroids_level2[:, 1:].dot(query.T).T / (np.linalg.norm(centroids_level2[:, 1:], axis=1) * np.linalg.norm(query)), axis= 1).squeeze().tolist()[::-1]
-        scores = results_ids[:50]
+        scores = results_ids[:100]
 
-        top_results_level_1 = self._search_with_cos_similarity(self.position, self.cluster_path, scores, query, 50, top_k)
+        top_results_level_1 = self._search_with_cos_similarity(self.position, self.cluster_path, scores, query, 100, top_k)
 
         # here we assume that if two rows have the same score, return the lowest ID
         return [score[1] for score in top_results_level_1]
