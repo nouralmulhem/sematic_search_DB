@@ -18,15 +18,16 @@ The key components of the project include:
 - `insert_records()`: A method to insert vectors into the database.
 - `retrieve()`: A method to retrieve the top-k most similar based on a given query vector.
 - `_cal_score()`: A helper method to calculate the cosine similarity between two vectors.
-- `_build_index()`: A placeholder method for implementing an indexing mechanism.
+- `_build_index()`: The function responsible for the indexing.
 
 ## <img  align= center width=50px height=50px src="https://c.tenor.com/HgX89Yku5V4AAAAi/to-the-moon.gif"> Get Started <a id = "started"></a>
 
 To get started with the project, follow these steps:
+
 1. Clone the repository to your local machine.
-2. Run the provided code and then implement another class for VecDB as per the project requirements.
+2. Run the provided code, you can see the notebook for more clarification.
 3. Customize the code and add any additional features as needed.
-4. Run the evaluation to assess the accuracy of your implementation. The final evaluation will use the 'eval' function, but I wil update the 'run_queries' function.
+4. Run the evaluation to assess the accuracy of your implementation.
 
 ## <img  align= center width=50px height=50px src="https://cdn.pixabay.com/animation/2022/07/31/06/27/06-27-17-124_512.gif"> Modules <a id ="modules"></a>
 
