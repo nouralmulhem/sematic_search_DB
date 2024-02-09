@@ -2,7 +2,7 @@
 
 <img src="https://i.giphy.com/sRFEa8lbeC7zbcIZZR.webp"/>
 
-    **This repository contains the code and documentation for a semantic search engine that utilizes vectorized databases.** The project's primary focus is on building an efficient indexing system to retrieve the top-k most similar vectors based on a given query vector. It also includes an evaluation of the performance of the implemented indexing system. The system is designed to retrieve information based on vector space embeddings, demonstrating the implementation and usage of a vectorized database in a practical application.
+    This repository contains the code and documentation for a semantic search engine that utilizes vectorized databases. The project's primary focus is on building an efficient indexing system to retrieve the top-k most similar vectors based on a given query vector. It also includes an evaluation of the performance of the implemented indexing system. The system is designed to retrieve information based on vector space embeddings, demonstrating the implementation and usage of a vectorized database in a practical application.
 
 ## <img align= center width=50px height=50px src="https://user-images.githubusercontent.com/71986226/154075883-2a5679d2-b411-448f-b423-9565babf35aa.gif"> Table of Contents
 - <a href ="#Overview">Overview</a>
