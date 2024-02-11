@@ -2,7 +2,7 @@ from typing import Dict, List, Annotated
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
-from file import BinaryFile
+from binary_file import BinaryFile
 
 class IvfDb:
     def __init__(self, file_path = "saved_db.bin", new_db = True) -> None:
